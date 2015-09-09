@@ -190,7 +190,7 @@ void loop()
       Serial.print(c);
     }
   
-    // client.stop();
+    client.stop();
   
     // if the server's disconnected, stop the client:
     if (!client.connected()) {
