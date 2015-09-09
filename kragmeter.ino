@@ -9,6 +9,7 @@ based on: AnalogInOutSerial Arduino example by Tom Igoe
           
 History:
 2012-11-06 - Added i2c temperature sensor code
+2015-09-09 - Changed server IP. Cleaned up code.
 
 
 Prepaid electricity meter flash counter and uploader
@@ -41,8 +42,7 @@ long lastUploadTime = 0;
 // Enter a MAC address for your controller below.
 // Newer Ethernet shields have a MAC address printed on a sticker on the shield
 byte mac[] = {  0x90, 0xA2, 0xDA, 0x00, 0x29, 0x4F };
-IPAddress server(192,168,2,101); // my server
-IPAddress upstreamserver(146,232,220,17); // upstream server
+IPAddress upstreamserver(104,167,103,171); // upstream server
 
 // Initialize the Ethernet client library
 // with the IP address and port of the server 
@@ -58,11 +58,10 @@ void setup() {
   Serial.println("System startup");
   
   // start the Ethernet connection:
-  if (Ethernet.begin(mac) == 0) {
+  while (Ethernet.begin(mac) == 0) {
     Serial.println("Failed to configure Ethernet using DHCP");
-    // no point in carrying on, so do nothing forevermore:
-    for(;;)
-      ;
+    //after a power outage, wait for the router to boot up and try again
+    delay(10000);
   }
   // give the Ethernet shield a second to initialize:
   
@@ -149,67 +148,18 @@ void loop()
     int countToUpload = ledcount;
     ledcount = 0;
     upload = 0;
-    // if you get a connection, report back via serial:
-    
-//upload to local server    
-    if (client.connect(server, 80)) {
-      Serial.println("connected");
-      Serial.print("GET /uploadkrag.php?seconds=");
-      Serial.print(seconds);
-      Serial.print("&flashes=");
-      Serial.print(countToUpload);
-      Serial.print("&temperature=");
-      Serial.print(readTemperature());
-      Serial.println(" HTTP/1.0");
-      
-      // Make a HTTP request:
-      client.print("GET /uploadkrag.php?seconds=");
-      client.print(seconds);
-      client.print("&flashes=");
-      client.print(countToUpload);
-      client.print("&temperature=");
-      client.print(readTemperature());
-      client.println(" HTTP/1.0");
-      client.println();
-          
-      lastUploadTime = currentTime;
-    } 
-    else {
-      // kf you didn't get a connection to the server:
-      Serial.println("connection to local server failed");
-      
-      //sonder hierdie twee lyne sal hy oor en oor probeer tot hy suksesvol is en dan die gemiddelde van die hele tydperk upload
-      //eerder net gemiddeld van die afgelope 60s
-      //lastUploadTime = currentTime;
-      //ledcount=0;
-    }
-      // if there are incoming bytes available 
-    // from the server, read them and print them:
-    if (client.available()) {
-      char c = client.read();
-      Serial.print(c);
-    }
-  
-    client.stop();
-  
-    // if the server's disconnected, stop the client:
-    if (!client.connected()) {
-      Serial.println();
-      Serial.println("disconnected.");
-      client.stop();
-    }
-    
-  delay(100);
+    float temperature = readTemperature();
     
 //upload to remote server    
     if (client.connect(upstreamserver, 80)) {
+      // if you get a connection, report back via serial:
       Serial.println("connected");
       Serial.print("GET http://www.jpmeijers.com/powermeter/insertdata.php?seconds=");
       Serial.print(seconds);
       Serial.print("&flashes=");
       Serial.print(countToUpload);
       Serial.print("&temperature=");
-      Serial.print(readTemperature());
+      Serial.print(temperature);
       Serial.println(" HTTP/1.0");
       
       // Make a HTTP request:
@@ -218,14 +168,14 @@ void loop()
       client.print("&flashes=");
       client.print(countToUpload);
       client.print("&temperature=");
-      client.print(readTemperature());
+      client.print(temperature);
       client.println(" HTTP/1.0");
       client.println();
           
       lastUploadTime = currentTime;
     } 
     else {
-      // kf you didn't get a connection to the server:
+      // if you didn't get a connection to the server:
       Serial.println("connection to remote server failed");
       
       //sonder hierdie twee lyne sal hy oor en oor probeer tot hy suksesvol is en dan die gemiddelde van die hele tydperk upload
@@ -240,7 +190,7 @@ void loop()
       Serial.print(c);
     }
   
-    client.stop();
+    // client.stop();
   
     // if the server's disconnected, stop the client:
     if (!client.connected()) {
